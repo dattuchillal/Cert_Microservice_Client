@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, OnDestroy, HostListener } from '@angular/core';
 import { Subscription, Subject, Observable, interval, Observer, of, throwError } from 'rxjs';
 import { takeWhile, map, catchError, finalize, takeUntil, distinctUntilChanged } from 'rxjs/internal/operators';
 import { FormGroup, FormBuilder, Validators } from '@angular/forms';
@@ -12,6 +12,8 @@ import { stompConfig } from '../../../core/stomp.config';
 import { FrameImpl } from '@stomp/stompjs';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { AppDateAdapter, APP_DATE_FORMATS } from '../../../shared/dateAdapter/date.adapter';
+import { NotificationService } from '../../../shared/notification/notification.service';
+import { TranslationES } from '../../../shared/translation/translate_es';
 
 @Component({
   selector: 'adif-consultant-period-home',
@@ -35,7 +37,8 @@ export class ConsultantPeriodHomeComponent implements OnInit, OnDestroy {
   constructor(
     private http: HttpClient,
     private formBuilder: FormBuilder,
-    private consultingPeriodsService: ConsultingPeriodsService
+    private consultingPeriodsService: ConsultingPeriodsService,
+    private notificationService: NotificationService
   ) {
     this.loadBudgetList();
     this.consultingPeriodsManagement = this.formBuilder.group({
@@ -88,7 +91,15 @@ export class ConsultantPeriodHomeComponent implements OnInit, OnDestroy {
 
   send(obj: Periodo) {
     this.whileLoading = true;
-    this.consultingPeriodsService.cert(obj).subscribe();
+    this.consultingPeriodsService.cert(obj)
+    .pipe(
+      catchError(err => {
+        this.notificationService.setNotification(TranslationES.consultant_period.sorryForIncovinience);
+        this.whileLoading = false;
+        return throwError(err);
+      })
+    )
+    .subscribe();
   }
 
   initialStatus() {
@@ -104,6 +115,20 @@ export class ConsultantPeriodHomeComponent implements OnInit, OnDestroy {
         'codigo': this.codigoControl.value
       });
     }
+  }
+
+  @HostListener('body:click', ['$event'])
+  onclick(event) {
+    const ele: HTMLElement = <HTMLElement> event.target;
+    const eleClass = ele.parentElement.parentElement;
+    if (eleClass && !eleClass.classList.contains('notificationMsg')) {
+      this.notificationService.setNotification(null);
+    }
+  }
+
+  @HostListener('window:popstate', ['$event'])
+  onPopState(event) {
+    this.notificationService.setNotification(null);
   }
 
   ngOnDestroy() {
